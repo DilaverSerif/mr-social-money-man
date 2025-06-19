@@ -43,7 +43,11 @@ public class Program
         else if (args.Contains("--testface"))
         {
             var testVideoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test", "test.mp4");
-            var testfaceCenterX = FaceCropper.DetectFaceCenterX(testVideoPath);
+            Console.WriteLine("Test video yolu: " + testVideoPath);
+            FaceCropper.CropToVertical(testVideoPath);
+            Console.WriteLine("Yüz tespiti ve kırpma işlemi tamamlandı.");
+            return;
+            var testfaceCenterX = 100;
             Console.WriteLine("Yüz merkezi X koordinatı: " + testfaceCenterX);
 
             if (!File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test", "output", "testface.mp4")))
@@ -79,15 +83,15 @@ public class Program
         Console.WriteLine("Video indirildi: " + downloadVideoPath);
         var wavExportPath = await VideoEditor.ConvertVideoToWavAsync(downloadVideoPath, GeneralSettings.GetWavExportPath(getVideoTitle));
         await WhisperBrain.TranscribeAudioWithTimestamps(wavExportPath, GeneralSettings.GetOutputDirectoryForJson(getVideoTitle));
-        var faceCenterX = FaceCropper.DetectFaceCenterX(downloadVideoPath);
-        Console.WriteLine("Yüz merkezi X koordinatı: " + faceCenterX);
+        //var faceCenterX = FaceCropper.DetectFaceCenterX(downloadVideoPath);
+        //Console.WriteLine("Yüz merkezi X koordinatı: " + faceCenterX);
 
-        VideoEditor.CropToVertical(
-            downloadVideoPath,
-            GeneralSettings.GetOutputDirectory(getVideoTitle),
-            faceCenterX,
-            1080, // Yükseklik
-            1920); // Genişlik
+        // VideoEditor.CropToVertical(
+        //     downloadVideoPath,
+        //     GeneralSettings.GetOutputDirectory(getVideoTitle),
+        //     faceCenterX,
+        //     1080, // Yükseklik
+        //     1920); // Genişlik
 
         //VideoEditor.ResizeVideoWithPreset(videoDownloanedPath, GeneralSettings.GetOutputDirectory(getVideoTitle), VideoPreset.Portrait);
     }
