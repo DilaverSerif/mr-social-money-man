@@ -39,26 +39,35 @@ public class Program
                 24, "white", 50, 100);
             return;
         }
-        else if (args.Contains("--testdownload"))
-        {
-            Console.WriteLine("Test download modu aktif!");
-            var videoPath = YoutubeDownloader.DownloadVideoAsync("https://www.youtube.com/watch?v=66adFeve3ME", GeneralSettings.GetDownloadDirectory("testvideo"));
-            Console.WriteLine("Video indirildi: " + videoPath);
-            return;
-        }
+
         else if (args.Contains("--testface"))
         {
-            var testVideoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads","test", "test.mp4");
+            var testVideoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test", "test.mp4");
             var testfaceCenterX = FaceCropper.DetectFaceCenterX(testVideoPath);
             Console.WriteLine("Yüz merkezi X koordinatı: " + testfaceCenterX);
 
+            if (!File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test", "output", "testface.mp4")))
+            {
+                Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test"));
+                Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test", "output"));
+            }
+
             VideoEditor.CropToVertical(
                 testVideoPath,
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"downloads","test", "output", "testface.mp4"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test", "output", "testface.mp4"),
                 testfaceCenterX,
                 1080, // Yükseklik
                 1920); // Genişlik
-            
+
+            return;
+        }
+        else if (args.Contains("--testdownload"))
+        {
+            Console.WriteLine("Test download modu aktif!");
+            var testvideoUrl = "https://www.youtube.com/watch?v=_sY3FrDJGH8";
+            var testgetVideoTitle = await YoutubeDownloader.GetVideoTitleAsync(testvideoUrl);
+            Console.WriteLine("Test video başlığı: " + testgetVideoTitle);
+            var testdownloadVideoPath = await YoutubeDownloader.DownloadVideoAsync(testvideoUrl, GeneralSettings.GetDownloadDirectory(testgetVideoTitle));
             return;
         }
 
@@ -79,7 +88,7 @@ public class Program
             faceCenterX,
             1080, // Yükseklik
             1920); // Genişlik
-            
+
         //VideoEditor.ResizeVideoWithPreset(videoDownloanedPath, GeneralSettings.GetOutputDirectory(getVideoTitle), VideoPreset.Portrait);
     }
 }

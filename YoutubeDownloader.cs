@@ -5,70 +5,70 @@ namespace RoboTube;
 public static class YoutubeDownloader
 {
     public static async Task<string> DownloadVideoAsync(string videoUrl, string downloadPath)
-{
-    var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "yt-dlp");
-
-    // İndirme dizini yoksa oluştur
-    if (!Directory.Exists(downloadPath))
-        Directory.CreateDirectory(downloadPath);
-
-    var userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
-    var outputTemplate = Path.Combine(downloadPath, "%(title)s.%(ext)s");
-
-    var psi = new ProcessStartInfo
     {
-        FileName = exePath,
-        Arguments = $"\"{videoUrl}\" -o \"{outputTemplate}\" -f mp4 --restrict-filenames --user-agent \"{userAgent}\"",
-        RedirectStandardOutput = true,
-        RedirectStandardError = true,
-        UseShellExecute = false,
-        CreateNoWindow = true
-    };
+        var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "yt-dlp");
 
-    var tcs = new TaskCompletionSource<bool>();
-    string errorOutput = "";
+        // İndirme dizini yoksa oluştur
+        if (!Directory.Exists(downloadPath))
+                Directory.CreateDirectory(downloadPath);
 
-    using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        var userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
+        var outputTemplate = Path.Combine(downloadPath, "%(title)s.%(ext)s");
 
-    process.OutputDataReceived += (s, e) =>
-    {
-        if (!string.IsNullOrWhiteSpace(e.Data))
-            Console.WriteLine("YT-DLP: " + e.Data);
-    };
-
-    process.ErrorDataReceived += (s, e) =>
-    {
-        if (!string.IsNullOrWhiteSpace(e.Data))
+        var psi = new ProcessStartInfo
         {
-            Console.Error.WriteLine("YT-DLP HATA: " + e.Data);
-            errorOutput += e.Data + "\n";
-        }
-    };
+            FileName = exePath,
+            Arguments = $"\"{videoUrl}\" -o \"{outputTemplate}\" -f \"bv*[height=1080]+ba\" --merge-output-format mp4 --restrict-filenames --user-agent \"{userAgent}\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
 
-    process.Exited += (s, e) =>
-    {
-        tcs.TrySetResult(true);
-    };
+        var tcs = new TaskCompletionSource<bool>();
+        string errorOutput = "";
 
-    process.Start();
-    process.BeginOutputReadLine();
-    process.BeginErrorReadLine();
+        using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
 
-    await tcs.Task;
-    await process.WaitForExitAsync();
+        process.OutputDataReceived += (s, e) =>
+        {
+            if (!string.IsNullOrWhiteSpace(e.Data))
+                Console.WriteLine("YT-DLP: " + e.Data);
+        };
 
-    if (!string.IsNullOrEmpty(errorOutput))
-        throw new Exception("yt-dlp hata verdi:\n" + errorOutput);
+        process.ErrorDataReceived += (s, e) =>
+        {
+            if (!string.IsNullOrWhiteSpace(e.Data))
+            {
+                Console.Error.WriteLine("YT-DLP HATA: " + e.Data);
+                errorOutput += e.Data + "\n";
+            }
+        };
 
-    var videoPath = Directory.GetFiles(downloadPath, "*.mp4")
-        .OrderByDescending(f => new FileInfo(f).CreationTime)
-        .FirstOrDefault();
+        process.Exited += (s, e) =>
+        {
+            tcs.TrySetResult(true);
+        };
 
-    if (string.IsNullOrEmpty(videoPath) || !File.Exists(videoPath))
-        throw new Exception($"Video indirilemedi. İndirme dizini: {downloadPath}");
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
 
-    return videoPath;
-}
+        await tcs.Task;
+        await process.WaitForExitAsync();
+
+        if (!string.IsNullOrEmpty(errorOutput))
+            throw new Exception("yt-dlp hata verdi:\n" + errorOutput);
+
+        var videoPath = Directory.GetFiles(downloadPath, "*.mp4")
+            .OrderByDescending(f => new FileInfo(f).CreationTime)
+            .FirstOrDefault();
+
+        if (string.IsNullOrEmpty(videoPath) || !File.Exists(videoPath))
+            throw new Exception($"Video indirilemedi. İndirme dizini: {downloadPath}");
+
+        return videoPath;
+    }
 
 
 

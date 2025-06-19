@@ -164,33 +164,52 @@ namespace RoboTube
         }
 
         public static void CropToVertical(string inputPath, string outputPath, int faceCenterX, int width, int height)
-        {
-            string ffmpegPath = GeneralSettings.GetFFmpegPath();
+{
+    Console.WriteLine("Video kırpma işlemi başlatılıyor...");
+    string ffmpegPath = GeneralSettings.GetFFmpegPath();
 
-            int verticalHeight = height;
-            int verticalWidth = (int)(verticalHeight * 9.0 / 16.0);
+    // Maksimum kırpma yüksekliği: mevcut yüksekliği aşmasın
+    int verticalHeight = height;
 
-            // Yüzün merkezine göre kırpma başlangıç noktası hesapla
-            int cropX = Math.Max(0, faceCenterX - verticalWidth / 2);
-            if (cropX + verticalWidth > width)
-                cropX = width - verticalWidth;
+    // İdeal dikey format oranı 9:16
+    int idealWidth = (int)(verticalHeight * 9.0 / 16.0);
 
-            string args = $"-i \"{inputPath}\" -vf \"crop={verticalWidth}:{verticalHeight}:{cropX}:0\" -c:a copy \"{outputPath}\"";
+    // Eğer hesaplanan genişlik, videonun genişliğini aşıyorsa yeniden hesapla
+    if (idealWidth > width)
+    {
+        idealWidth = width;
+        verticalHeight = (int)(idealWidth * 16.0 / 9.0);
+    }
 
-            var psi = new ProcessStartInfo
-            {
-                FileName = ffmpegPath,
-                Arguments = args,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
+    int cropX = Math.Max(0, faceCenterX - idealWidth / 2);
+    if (cropX + idealWidth > width)
+        cropX = width - idealWidth;
 
-            using var process = Process.Start(psi);
-            process.WaitForExit();
-            Console.WriteLine("Video kırpma tamamlandı.");
-        }
+    if (File.Exists(outputPath))
+        File.Delete(outputPath);
+
+    string args = $"-i \"{inputPath}\" -vf \"crop={idealWidth}:{verticalHeight}:{cropX}:0\" -c:v libx264 -preset veryfast -c:a aac \"{outputPath}\"";
+
+    var psi = new ProcessStartInfo
+    {
+        FileName = ffmpegPath,
+        Arguments = args,
+        UseShellExecute = false,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        CreateNoWindow = true
+    };
+
+    using var process = Process.Start(psi);
+    string errorOutput = process.StandardError.ReadToEnd();
+    process.WaitForExit();
+
+    Console.WriteLine("FFmpeg hata çıktısı:");
+    Console.WriteLine(errorOutput);
+    Console.WriteLine("Video kırpma tamamlandı.");
+}
+
+
 
 
     }
