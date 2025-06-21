@@ -1,16 +1,45 @@
 ﻿using mrmoneyman;
 using RoboTube;
-
+using OpenCvSharp;
+using System.Runtime.InteropServices;
+using Mediapipe.FaceGeometry;
 public class Program
 {
+
+    [DllImport("OpenCvSharpExtern")]
+    public static extern int cuda_GetCudaEnabledDeviceCount();
+
     public static async Task Main(string[] args)
     {
 
         if (args.Contains("--testedit"))
         {
             Console.WriteLine("Test edit modu aktif!");
-    
+
             return;
+        }
+        else if (args.Contains("--testcuda"))
+        {
+            Console.WriteLine("CUDA destekli cihaz sayısı: " + cuda_GetCudaEnabledDeviceCount());
+        }
+        else if (args.Contains("--testgemini"))
+        {
+            // var faceMesh = new FaceMeshSolution();
+            // faceMesh.Initialize(FaceMeshConfig.DefaultConfig(isGpu: true));
+
+            // var bytes = File.ReadAllBytes("photo.jpg");
+            // var result = await faceMesh.ProcessImageAsync(bytes);
+
+            // landmark'lar burada
+            // foreach (var face in result.MultiFaceLandmarks)
+            // {
+            //     foreach (var lm in face.Landmark)
+            //         Console.WriteLine($"{lm.X}, {lm.Y}, {lm.Z}");
+            // }
+            return;
+        }
+        else if (args.Contains("--testtranscript"))
+        {
         }
         else if (args.Contains("--testwhisper"))
         {
@@ -35,39 +64,13 @@ public class Program
         else if (args.Contains("--testscroll"))
         {
             Console.WriteLine("Test scroll modu aktif!");
-            VideoAnimations.AddScrollingTextToVideo(
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test", "test.mp4"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "output", "output.mp4"),
-                "RoboTube - YouTube Video Editor",
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "font.ttf"),
-                24, "white", 50, 100);
+            VideoSubtitleGenerator.ProcessVideo("En İyi Fallout Şehri Hangisi?", FaceSelectionStrategy.LargestFace);
             return;
         }
 
         else if (args.Contains("--testface"))
         {
-            var testVideoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test.mp4");
-            Console.WriteLine("Test video yolu: " + testVideoPath);
-            await FaceCropper.CropToVerticalAsync(testVideoPath, FaceSelectionStrategy.LargestFace);
-            Console.WriteLine("Yüz tespiti ve kırpma işlemi tamamlandı.");
-            return;
-
-            var testfaceCenterX = 100;
-            Console.WriteLine("Yüz merkezi X koordinatı: " + testfaceCenterX);
-
-            if (!File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test", "output", "testface.mp4")))
-            {
-                Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test"));
-                Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test", "output"));
-            }
-
-            VideoEditor.CropToVertical(
-                testVideoPath,
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test", "output", "testface.mp4"),
-                testfaceCenterX,
-                1080, // Yükseklik
-                1920); // Genişlik
-
+            await FaceCropper.CropToVerticalAsync("En İyi Fallout Şehri Hangisi?", FaceSelectionStrategy.LargestFace);
             return;
         }
         else if (args.Contains("--testdownload"))
@@ -84,12 +87,12 @@ public class Program
         Console.WriteLine("Normal mod");
         var videoUrl = "https://www.youtube.com/watch?v=EGJpVzgKbIc";
         var videoTitleName = await YoutubeDownloader.GetVideoTitleAsync(videoUrl);
-        if(videoTitleName == string.Empty)
+        if (videoTitleName == string.Empty)
         {
             Console.WriteLine("Video başlığı alınamadı. Lütfen geçerli bir YouTube URL'si girin.");
             return;
         }
-        
+
         var downloadVideoAsync = await YoutubeDownloader.DownloadVideoAsync(videoUrl, videoTitleName);
 
         if (!downloadVideoAsync)
@@ -98,26 +101,26 @@ public class Program
             return;
         }
         Console.WriteLine("Video indirildi: " + GeneralSettings.GetDownloadDirectory(videoTitleName));
-        
+
         var convertVideoToWavAsync = await VideoEditor.ConvertVideoToWavAsync(videoTitleName);
-        
-        if(!convertVideoToWavAsync)
+
+        if (!convertVideoToWavAsync)
         {
             Console.WriteLine("Video WAV formatına dönüştürülemedi. Lütfen geçerli bir video dosyası girin.");
             return;
         }
         Console.WriteLine("Video WAV formatına dönüştürüldü: " + GeneralSettings.GetWavByOutputPath(videoTitleName));
-        
+
         var transcriptPath = await WhisperBrain.TranscribeAudioWithTimestamps(videoTitleName);
-        
+
         Console.WriteLine("Transkript dosyası oluşturuldu: " + transcriptPath);
-        
+
         var geminiResponse = await Brain_Gemini.TalkWithGemini(videoTitleName);
         Console.WriteLine("Gemini yanıtladı");
-        var result = await VideoEditor.TrimFromJsonAsync(geminiResponse,videoTitleName);
-        
-        var faceCenterX = FaceCropper.CropToVerticalAsync(videoTitleName, FaceSelectionStrategy.LargestFace);
-        
+        var result = await VideoEditor.TrimFromJsonAsync(geminiResponse, videoTitleName);
+
+        await FaceCropper.CropToVerticalAsync(videoTitleName, FaceSelectionStrategy.LargestFace);
+
         //Console.WriteLine("Yüz merkezi X koordinatı: " + faceCenterX);
 
         // VideoEditor.CropToVertical(

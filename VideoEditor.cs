@@ -51,9 +51,10 @@ namespace RoboTube
         }
         public static async Task<bool> ConvertVideoToWavAsync(string videoTitle)
         {
+            Console.WriteLine("Video WAV formatına dönüştürülüyor: " + videoTitle);
             var inputPath = GeneralSettings.GetVideoDirectory(videoTitle);
             var outputPath = GeneralSettings.GetWavByOutputPath(videoTitle);
-            
+
             string arguments = $"-i \"{inputPath}\" -vn -acodec pcm_s16le -ar 44100 -ac 2 \"{outputPath}\"";
 
             var psi = new ProcessStartInfo
@@ -193,9 +194,11 @@ namespace RoboTube
                 Console.WriteLine("FFmpeg hata çıktısı:" + stderr);
                 return false;
             }
-            
+
             Console.WriteLine($"Video kesme işlemi tamamlandı: {outPath}");
             return true;
         }
+
+     
     }
 }

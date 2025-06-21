@@ -19,14 +19,10 @@ public class FaceCropper
         return await Task.Run(() =>
         {
             Console.WriteLine("Start Time: " + DateTime.Now);
+
             var CascadeClassifierPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "haarcascade_frontalface_default.xml");
             var faceCascade = new CascadeClassifier(CascadeClassifierPath);
-            var outputVideoDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test");
 
-            if (!Directory.Exists(outputVideoDir))
-            {
-                Directory.CreateDirectory(outputVideoDir);
-            }
 
             var outputVideoPath = GeneralSettings.GetFaceCropVideoDirectory(videoTitle, strategy);
             var inputVideoPath = GeneralSettings.GetTrimVideoDirectory(videoTitle);

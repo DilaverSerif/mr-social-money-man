@@ -30,13 +30,21 @@ namespace RoboTube
             return videoDirectory;
         }
         
+        public static string GetFinishVideoDirectory(string videoTitle)
+        {
+            var downloadDirectory = GetDownloadDirectory(videoTitle);
+            var videoDirectory = Path.Combine(downloadDirectory, $"{videoTitle}_finished.mp4");
+
+            return videoDirectory;
+        }
+        
         public static string GetDownloadDirectory(string videoName)
         {
             // Varsayılan indirme dizini, uygulamanın çalıştığı dizin altında "downloads" klasörü
             string downloadDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads");
             string dateTimeFolderDirectory = Path.Combine(downloadDirectory, DateTimeNow);
             string videoNameFolderDirectory = Path.Combine(dateTimeFolderDirectory, videoName);
-            
+
             // Eğer "downloads" klasörü yoksa oluştur
             if (!Directory.Exists(downloadDirectory))
             {
@@ -57,6 +65,15 @@ namespace RoboTube
 
             return videoNameFolderDirectory;
         }
+        
+        public static string GetGeminiJsonPath(string videoTitle)
+        {
+            string downloadDirectory = GetDownloadDirectory(videoTitle);
+            string geminiJsonPath = Path.Combine(downloadDirectory, "gemini.json");
+
+   
+            return geminiJsonPath;
+        }
 
         // public static string GetOutputDirectory(string getVideoTitle)
         // {
@@ -74,7 +91,7 @@ namespace RoboTube
         //
         //     return outputDirectory;
         // }
-        
+
         public static string GetWavByOutputPath(string getVideoTitle)
         {
             string downloadDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads");
@@ -89,7 +106,7 @@ namespace RoboTube
             // {
             //     Directory.CreateDirectory(wavExportPath);
             // }
-            
+
             return wavExportPath;
         }
         

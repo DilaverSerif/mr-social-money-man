@@ -10,7 +10,7 @@ namespace mrmoneyman
         {
             var jsonFilePath = GeneralSettings.GetTranscriptByVideoTitle(videoTitle);
             var json = await File.ReadAllTextAsync(jsonFilePath);
-            
+
             var apiKey = Environment.GetEnvironmentVariable("GOOGLE_API_KEY");
             var systemInstructionString = Path.Combine(Directory.GetCurrentDirectory(), "Gemini", "system_instruction.txt");
             var systemInstruction = new Content(File.ReadAllText(systemInstructionString));
@@ -26,13 +26,31 @@ namespace mrmoneyman
                 Console.WriteLine("Gemini API hatası");
                 return null;
             }
-
-
-            return response.Text switch
+            if (response.Text == null)
             {
-                { } text => JsonSerializer.Deserialize<VideoSegment>(text),
-                _ => throw new InvalidOperationException("Beklenmeyen yanıt türü: " + response.Text.GetType())
-            };
+                Console.WriteLine("Gemini API Hatası:");
+                return null;
+            }
+
+            var clearJson = response.Text.ToVideoSegment();
+            File.WriteAllText(GeneralSettings.GetGeminiJsonPath(videoTitle), clearJson);
+
+            return JsonSerializer.Deserialize<VideoSegment>(clearJson);
+        }
+
+        public static string ToVideoSegment(this string json)
+        {
+            // Gerekirse baştaki ```json ve sondaki ``` işaretlerini kaldır
+            string cleanJson = json.Trim().Trim('`');
+            if (cleanJson.StartsWith("json"))
+            {
+                cleanJson = cleanJson.Substring(4).Trim();
+            }
+
+            return cleanJson;
         }
     }
+
+
 }
+

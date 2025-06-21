@@ -7,6 +7,7 @@ public static class WhisperBrain
 {
     public static async Task<bool> TranscribeAudioWithTimestamps(string videoTitle)
     {
+        Console.WriteLine("Transkription işlemi başlatılıyor: " + videoTitle);
         var audioFilePath = GeneralSettings.GetWavByOutputPath(videoTitle);
         var outputDir = GeneralSettings.GetOutputDirectoryForJson(videoTitle,"transcript");
 
