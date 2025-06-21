@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 
 namespace RoboTube
 {
@@ -9,7 +10,7 @@ namespace RoboTube
         Landscape,  // 1920x1080
         Square      // 1080x1080
     }
-    public class VideoEditor
+    public static class VideoEditor
     {
         public static bool ConvertVideoToMp3(string inputPath, string outputPath)
         {
@@ -48,12 +49,11 @@ namespace RoboTube
                 return false;
             }
         }
-        public static async Task<string> ConvertVideoToWavAsync(string inputPath, string outputPath)
+        public static async Task<bool> ConvertVideoToWavAsync(string videoTitle)
         {
-            // Eğer outputPath uzantısızsa .wav ekle
-            if (string.IsNullOrWhiteSpace(Path.GetExtension(outputPath)))
-                outputPath = Path.Combine(outputPath, "audio.wav");
-
+            var inputPath = GeneralSettings.GetVideoDirectory(videoTitle);
+            var outputPath = GeneralSettings.GetWavByOutputPath(videoTitle);
+            
             string arguments = $"-i \"{inputPath}\" -vn -acodec pcm_s16le -ar 44100 -ac 2 \"{outputPath}\"";
 
             var psi = new ProcessStartInfo
@@ -68,7 +68,9 @@ namespace RoboTube
 
             try
             {
-                using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+                using var process = new Process();
+                process.StartInfo = psi;
+                process.EnableRaisingEvents = true;
 
                 var stdError = new StringBuilder();
                 var tcs = new TaskCompletionSource<bool>();
@@ -92,125 +94,108 @@ namespace RoboTube
                 await process.WaitForExitAsync();
 
                 if (process.ExitCode == 0)
-                    return outputPath;
+                    return true;
 
                 Console.WriteLine("FFmpeg Hatası:\n" + stdError.ToString());
-                return string.Empty;
+                return false;
             }
             catch (Exception ex)
             {
                 Console.WriteLine("İşlem başlatılamadı: " + ex.Message);
-                return string.Empty;
+                return false;
             }
         }
-
-        public static string ResizeVideoWithPreset(string inputPath, string outputPath, VideoPreset preset)
+        public static void CropToVertical(string inputPath, string outputPath, int faceCenterX, int width, int height)
         {
-            // Eğer outputPath uzantısızsa .mp4 ekle
-            if (string.IsNullOrWhiteSpace(Path.GetExtension(outputPath)))
-                outputPath += ".mp4";
+            Console.WriteLine("Video kırpma işlemi başlatılıyor...");
+            string ffmpegPath = GeneralSettings.GetFFmpegPath();
 
-            string filter = preset switch
+            // Maksimum kırpma yüksekliği: mevcut yüksekliği aşmasın
+            int verticalHeight = height;
+
+            // İdeal dikey format oranı 9:16
+            int idealWidth = (int)(verticalHeight * 9.0 / 16.0);
+
+            // Eğer hesaplanan genişlik, videonun genişliğini aşıyorsa yeniden hesapla
+            if (idealWidth > width)
             {
-                VideoPreset.Portrait => "scale='if(gt(a,9/16),1080,-2)':'if(gt(a,9/16),-2,1920)',pad=1080:1920:(1080-iw)/2:(1920-ih)/2",
-                VideoPreset.Landscape => "scale='if(gt(a,16/9),1920,-2)':'if(gt(a,16/9),-2,1080)',pad=1920:1080:(1920-iw)/2:(1080-ih)/2",
-                VideoPreset.Square => "scale='if(gt(a,1),1080,-2)':'if(gt(a,1),-2,1080)',pad=1080:1080:(1080-iw)/2:(1080-ih)/2",
-                _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, null)
-            };
+                idealWidth = width;
+                verticalHeight = (int)(idealWidth * 16.0 / 9.0);
+            }
+
+            int cropX = Math.Max(0, faceCenterX - idealWidth / 2);
+            if (cropX + idealWidth > width)
+                cropX = width - idealWidth;
+
+            if (File.Exists(outputPath))
+                File.Delete(outputPath);
+
+            string args = $"-i \"{inputPath}\" -vf \"crop={idealWidth}:{verticalHeight}:{cropX}:0\" -c:v libx264 -preset veryfast -c:a aac \"{outputPath}\"";
 
             var psi = new ProcessStartInfo
             {
-                FileName = GeneralSettings.GetFFmpegPath(),
-                Arguments = $"-y -i \"{inputPath}\" -vf \"{filter}\" -c:a copy \"{outputPath}\"",
+                FileName = ffmpegPath,
+                Arguments = args,
+                UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                UseShellExecute = false,
                 CreateNoWindow = true
             };
 
-            string errorLog = "";
+            using var process = Process.Start(psi);
+            string errorOutput = process.StandardError.ReadToEnd();
+            process.WaitForExit();
 
-            using var process = new Process { StartInfo = psi };
-            process.OutputDataReceived += (s, e) =>
+            Console.WriteLine("FFmpeg hata çıktısı:");
+            Console.WriteLine(errorOutput);
+            Console.WriteLine("Video kırpma tamamlandı.");
+        }
+
+        public static async Task<bool> TrimFromJsonAsync(VideoSegment segment, string videoTitle)
+        {
+            var outPath = GeneralSettings.GetTrimVideoDirectory(videoTitle);
+            var inputPath = GeneralSettings.GetVideoDirectory(videoTitle);
+
+            if (string.IsNullOrWhiteSpace(outPath))
             {
-                if (!string.IsNullOrWhiteSpace(e.Data))
-                    Console.WriteLine("FFmpeg: " + e.Data);
-            };
-            process.ErrorDataReceived += (s, e) =>
+                Console.WriteLine("Çıkış yolu boş veya geçersiz.");
+                return false;
+            }
+
+
+            double duration = segment.End - segment.Start;
+
+            string start = segment.Start.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string dur = duration.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            string args = $"-i \"{inputPath}\" -ss {start} -t {dur} -c copy \"{outPath}\"";
+
+            var process = new Process
             {
-                if (!string.IsNullOrWhiteSpace(e.Data))
+                StartInfo = new ProcessStartInfo
                 {
-                    errorLog += e.Data + "\n";
-                    Console.Error.WriteLine("FFmpeg HATA: " + e.Data);
+                    FileName = GeneralSettings.GetFFmpegPath(),
+                    Arguments = args,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
                 }
             };
 
             process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            process.WaitForExit();
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            string stderr = await stderrTask;
 
-            if (File.Exists(outputPath))
+            if (process.ExitCode != 0)
             {
-                Console.WriteLine($"✅ Video '{preset}' çözünürlüğüne dönüştürüldü: {outputPath}");
-                return outputPath;
+                Console.WriteLine("FFmpeg hata çıktısı:" + stderr);
+                return false;
             }
-            else
-            {
-                Console.Error.WriteLine("❌ FFmpeg çıktıyı oluşturamadı.");
-                Console.Error.WriteLine(errorLog);
-                return string.Empty;
-            }
+            
+            Console.WriteLine($"Video kesme işlemi tamamlandı: {outPath}");
+            return true;
         }
-
-        public static void CropToVertical(string inputPath, string outputPath, int faceCenterX, int width, int height)
-{
-    Console.WriteLine("Video kırpma işlemi başlatılıyor...");
-    string ffmpegPath = GeneralSettings.GetFFmpegPath();
-
-    // Maksimum kırpma yüksekliği: mevcut yüksekliği aşmasın
-    int verticalHeight = height;
-
-    // İdeal dikey format oranı 9:16
-    int idealWidth = (int)(verticalHeight * 9.0 / 16.0);
-
-    // Eğer hesaplanan genişlik, videonun genişliğini aşıyorsa yeniden hesapla
-    if (idealWidth > width)
-    {
-        idealWidth = width;
-        verticalHeight = (int)(idealWidth * 16.0 / 9.0);
-    }
-
-    int cropX = Math.Max(0, faceCenterX - idealWidth / 2);
-    if (cropX + idealWidth > width)
-        cropX = width - idealWidth;
-
-    if (File.Exists(outputPath))
-        File.Delete(outputPath);
-
-    string args = $"-i \"{inputPath}\" -vf \"crop={idealWidth}:{verticalHeight}:{cropX}:0\" -c:v libx264 -preset veryfast -c:a aac \"{outputPath}\"";
-
-    var psi = new ProcessStartInfo
-    {
-        FileName = ffmpegPath,
-        Arguments = args,
-        UseShellExecute = false,
-        RedirectStandardOutput = true,
-        RedirectStandardError = true,
-        CreateNoWindow = true
-    };
-
-    using var process = Process.Start(psi);
-    string errorOutput = process.StandardError.ReadToEnd();
-    process.WaitForExit();
-
-    Console.WriteLine("FFmpeg hata çıktısı:");
-    Console.WriteLine(errorOutput);
-    Console.WriteLine("Video kırpma tamamlandı.");
-}
-
-
-
-
     }
 }

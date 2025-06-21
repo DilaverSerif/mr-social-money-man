@@ -4,16 +4,12 @@ namespace RoboTube;
 
 public static class YoutubeDownloader
 {
-    public static async Task<string> DownloadVideoAsync(string videoUrl, string downloadPath)
+    public static async Task<bool> DownloadVideoAsync(string videoUrl, string videoTitleName)
     {
-        var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "yt-dlp");
-
-        // İndirme dizini yoksa oluştur
-        if (!Directory.Exists(downloadPath))
-                Directory.CreateDirectory(downloadPath);
-
+        var exePath = GeneralSettings.GetTYTDLPPath();
+        
         var userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
-        var outputTemplate = Path.Combine(downloadPath, "%(title)s.%(ext)s");
+        var outputTemplate = GeneralSettings.GetVideoDirectory(videoTitleName);
 
         var psi = new ProcessStartInfo
         {
@@ -33,7 +29,7 @@ public static class YoutubeDownloader
         process.OutputDataReceived += (s, e) =>
         {
             if (!string.IsNullOrWhiteSpace(e.Data))
-                Console.WriteLine("YT-DLP: " + e.Data);
+                Console.WriteLine("\rYT-DLP: " + e.Data);
         };
 
         process.ErrorDataReceived += (s, e) =>
@@ -58,16 +54,12 @@ public static class YoutubeDownloader
         await process.WaitForExitAsync();
 
         if (!string.IsNullOrEmpty(errorOutput))
+        {
             throw new Exception("yt-dlp hata verdi:\n" + errorOutput);
-
-        var videoPath = Directory.GetFiles(downloadPath, "*.mp4")
-            .OrderByDescending(f => new FileInfo(f).CreationTime)
-            .FirstOrDefault();
-
-        if (string.IsNullOrEmpty(videoPath) || !File.Exists(videoPath))
-            throw new Exception($"Video indirilemedi. İndirme dizini: {downloadPath}");
-
-        return videoPath;
+            return false;
+        }
+        
+        return true;
     }
 
 
@@ -102,9 +94,9 @@ public static class YoutubeDownloader
             {
                 Console.WriteLine("Video başlığı alınamadı.");
                 if (!string.IsNullOrWhiteSpace(errors))
-                    Console.Error.WriteLine("YT-DLP HATA: " + errors);
+                    return string.Empty;
 
-                throw new Exception("Video başlığı alınamadı.");
+                return string.Empty;
             }
 
             Console.WriteLine($"Video başlığı: {title}");
@@ -113,6 +105,7 @@ public static class YoutubeDownloader
         catch (Exception ex)
         {
             Console.WriteLine("Hata oluştu: " + ex.Message);
+            return string.Empty;
             throw;
         }
     }

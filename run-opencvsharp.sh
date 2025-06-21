@@ -24,3 +24,4 @@ export LD_LIBRARY_PATH="$TARGET_NATIVE:$LD_LIBRARY_PATH"
 # 🚀 Projeyi çalıştır
 cd "$PROJECT_ROOT"
 dotnet run
+#export LD_LIBRARY_PATH=/home/bladon/Documents/Workspace/mr-social-money-man/bin/Debug/net9.0/runtimes/linux-x64/native:$LD_LIBRARY_PATH

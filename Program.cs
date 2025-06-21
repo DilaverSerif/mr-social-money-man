@@ -1,4 +1,5 @@
-﻿using RoboTube;
+﻿using mrmoneyman;
+using RoboTube;
 
 public class Program
 {
@@ -8,9 +9,12 @@ public class Program
         if (args.Contains("--testedit"))
         {
             Console.WriteLine("Test edit modu aktif!");
-            VideoEditor.ResizeVideoWithPreset(
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test", "test.mp4"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "output", "output.mp4"), VideoPreset.Portrait);
+    
+            return;
+        }
+        else if (args.Contains("--testwhisper"))
+        {
+            await WhisperBrain.TranscribeAudioWithTimestamps("En İyi Fallout Şehri Hangisi?");
             return;
         }
         else if (args.Contains("--testmp3"))
@@ -42,11 +46,12 @@ public class Program
 
         else if (args.Contains("--testface"))
         {
-            var testVideoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test", "test.mp4");
+            var testVideoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "downloads", "test.mp4");
             Console.WriteLine("Test video yolu: " + testVideoPath);
-            FaceCropper.CropToVertical(testVideoPath);
+            await FaceCropper.CropToVerticalAsync(testVideoPath, FaceSelectionStrategy.LargestFace);
             Console.WriteLine("Yüz tespiti ve kırpma işlemi tamamlandı.");
             return;
+
             var testfaceCenterX = 100;
             Console.WriteLine("Yüz merkezi X koordinatı: " + testfaceCenterX);
 
@@ -77,13 +82,42 @@ public class Program
 
 
         Console.WriteLine("Normal mod");
-        var videoUrl = "https://www.youtube.com/watch?v=66adFeve3ME";
-        var getVideoTitle = await YoutubeDownloader.GetVideoTitleAsync(videoUrl);
-        var downloadVideoPath = await YoutubeDownloader.DownloadVideoAsync(videoUrl, GeneralSettings.GetDownloadDirectory(getVideoTitle));
-        Console.WriteLine("Video indirildi: " + downloadVideoPath);
-        var wavExportPath = await VideoEditor.ConvertVideoToWavAsync(downloadVideoPath, GeneralSettings.GetWavExportPath(getVideoTitle));
-        await WhisperBrain.TranscribeAudioWithTimestamps(wavExportPath, GeneralSettings.GetOutputDirectoryForJson(getVideoTitle));
-        //var faceCenterX = FaceCropper.DetectFaceCenterX(downloadVideoPath);
+        var videoUrl = "https://www.youtube.com/watch?v=EGJpVzgKbIc";
+        var videoTitleName = await YoutubeDownloader.GetVideoTitleAsync(videoUrl);
+        if(videoTitleName == string.Empty)
+        {
+            Console.WriteLine("Video başlığı alınamadı. Lütfen geçerli bir YouTube URL'si girin.");
+            return;
+        }
+        
+        var downloadVideoAsync = await YoutubeDownloader.DownloadVideoAsync(videoUrl, videoTitleName);
+
+        if (!downloadVideoAsync)
+        {
+            Console.WriteLine("Video indirilemedi. Lütfen geçerli bir YouTube URL'si girin.");
+            return;
+        }
+        Console.WriteLine("Video indirildi: " + GeneralSettings.GetDownloadDirectory(videoTitleName));
+        
+        var convertVideoToWavAsync = await VideoEditor.ConvertVideoToWavAsync(videoTitleName);
+        
+        if(!convertVideoToWavAsync)
+        {
+            Console.WriteLine("Video WAV formatına dönüştürülemedi. Lütfen geçerli bir video dosyası girin.");
+            return;
+        }
+        Console.WriteLine("Video WAV formatına dönüştürüldü: " + GeneralSettings.GetWavByOutputPath(videoTitleName));
+        
+        var transcriptPath = await WhisperBrain.TranscribeAudioWithTimestamps(videoTitleName);
+        
+        Console.WriteLine("Transkript dosyası oluşturuldu: " + transcriptPath);
+        
+        var geminiResponse = await Brain_Gemini.TalkWithGemini(videoTitleName);
+        Console.WriteLine("Gemini yanıtladı");
+        var result = await VideoEditor.TrimFromJsonAsync(geminiResponse,videoTitleName);
+        
+        var faceCenterX = FaceCropper.CropToVerticalAsync(videoTitleName, FaceSelectionStrategy.LargestFace);
+        
         //Console.WriteLine("Yüz merkezi X koordinatı: " + faceCenterX);
 
         // VideoEditor.CropToVertical(
