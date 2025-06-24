@@ -27,6 +27,11 @@ public class FaceCropper
                 var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "res10_300x300_ssd_iter_140000.caffemodel");
 
                 var net = CvDnn.ReadNetFromCaffe(configPath, modelPath);
+                if (net == null)
+                {
+                    Console.WriteLine("Error: Could not load the face detection model.");
+                    return false;
+                }
                 net.SetPreferableBackend(Backend.CUDA);
                 net.SetPreferableTarget(Target.CUDA);
 
