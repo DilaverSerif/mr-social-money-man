@@ -106,56 +106,84 @@ namespace RoboTube
                 return false;
             }
         }
-        public static void CropToVertical(string inputPath, string outputPath, int faceCenterX, int width, int height)
+
+        public static async Task<bool> CombineVideoAndWav(string videoTitle, VideoPreset preset = VideoPreset.Landscape)
         {
-            Console.WriteLine("Video kırpma işlemi başlatılıyor...");
-            string ffmpegPath = GeneralSettings.GetFFmpegPath();
+            Console.WriteLine("Video MP4 formatına dönüştürülüyor: " + videoTitle);
 
-            // Maksimum kırpma yüksekliği: mevcut yüksekliği aşmasın
-            int verticalHeight = height;
+            var videoPath = GeneralSettings.GetSubtitleVideoDirectory(videoTitle);
+            var wavInputPath = GeneralSettings.GetWavByOutputPath(videoTitle);
+            var outputPath = GeneralSettings.GetFinishVideoDirectory(videoTitle);
+            var geminiAnswerPath = GeneralSettings.GetGeminiJsonPath(videoTitle);
 
-            // İdeal dikey format oranı 9:16
-            int idealWidth = (int)(verticalHeight * 9.0 / 16.0);
 
-            // Eğer hesaplanan genişlik, videonun genişliğini aşıyorsa yeniden hesapla
-            if (idealWidth > width)
+
+            try
             {
-                idealWidth = width;
-                verticalHeight = (int)(idealWidth * 16.0 / 9.0);
+                // JSON verisini oku
+                string json = await File.ReadAllTextAsync(geminiAnswerPath);
+                var doc = JsonDocument.Parse(json);
+                double start = doc.RootElement.GetProperty("Start").GetDouble();
+                double end = doc.RootElement.GetProperty("End").GetDouble();
+                double duration = end - start;
+
+
+                string tempWav = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + "_cut.wav");
+                Console.WriteLine("Geçici WAV dosyası: " + tempWav);
+                string cutAudioArgs = $"-i \"{wavInputPath}\" -ss {start} -to {end} -c:a pcm_s16le \"{tempWav}\"";
+                await RunFFmpegAsync(cutAudioArgs);
+
+                string outputArgs = $"-i \"{videoPath}\" -i \"{tempWav}\" " +
+                                    $"-map 0:v -map 1:a -c:v copy -c:a aac -shortest \"{outputPath}\"";
+                await RunFFmpegAsync(outputArgs);
+
+                // Geçici dosyayı sil
+                File.Delete(tempWav);
+
+                Console.WriteLine("Video başarıyla dönüştürüldü.");
+                return true;
             }
-
-            int cropX = Math.Max(0, faceCenterX - idealWidth / 2);
-            if (cropX + idealWidth > width)
-                cropX = width - idealWidth;
-
-            if (File.Exists(outputPath))
-                File.Delete(outputPath);
-
-            string args = $"-i \"{inputPath}\" -vf \"crop={idealWidth}:{verticalHeight}:{cropX}:0\" -c:v libx264 -preset veryfast -c:a aac \"{outputPath}\"";
-
-            var psi = new ProcessStartInfo
+            catch (Exception ex)
             {
-                FileName = ffmpegPath,
-                Arguments = args,
-                UseShellExecute = false,
+                Console.WriteLine("Hata: " + ex.Message);
+                return false;
+            }
+        }
+
+        private static async Task RunFFmpegAsync(string arguments)
+        {
+            var ffmpeg = new ProcessStartInfo
+            {
+                FileName = GeneralSettings.GetFFmpegPath(),
+                Arguments = arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
+                UseShellExecute = false,
                 CreateNoWindow = true
             };
 
-            using var process = Process.Start(psi);
-            string errorOutput = process.StandardError.ReadToEnd();
-            process.WaitForExit();
+            using var process = new Process { StartInfo = ffmpeg };
+            var output = new StringBuilder();
+            var error = new StringBuilder();
 
-            Console.WriteLine("FFmpeg hata çıktısı:");
-            Console.WriteLine(errorOutput);
-            Console.WriteLine("Video kırpma tamamlandı.");
+            process.OutputDataReceived += (s, e) => { if (e.Data != null) output.AppendLine(e.Data); };
+            process.ErrorDataReceived += (s, e) => { if (e.Data != null) error.AppendLine(e.Data); };
+
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode != 0)
+                throw new Exception($"FFmpeg hata verdi:\n{error}");
         }
+
 
         public static async Task<bool> TrimFromJsonAsync(VideoSegment segment, string videoTitle)
         {
             var outPath = GeneralSettings.GetTrimVideoDirectory(videoTitle);
             var inputPath = GeneralSettings.GetVideoDirectory(videoTitle);
+            var wavInputPath = GeneralSettings.GetWavByOutputPath(videoTitle);
 
             if (string.IsNullOrWhiteSpace(outPath))
             {
@@ -169,7 +197,8 @@ namespace RoboTube
             string start = segment.Start.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string dur = duration.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-            string args = $"-i \"{inputPath}\" -ss {start} -t {dur} -c copy \"{outPath}\"";
+            string args = $"-ss {start} -t {dur} -i \"{inputPath}\" -ss {start} -t {dur} -i \"{wavInputPath}\" -map 0:v:0 -map 1:a:0 -c:v libx264 -preset veryfast -c:a aac -b:a 128k -shortest \"{outPath}\"";
+
 
             var process = new Process
             {
@@ -199,6 +228,6 @@ namespace RoboTube
             return true;
         }
 
-     
+
     }
 }

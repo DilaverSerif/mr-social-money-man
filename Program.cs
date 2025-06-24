@@ -22,6 +22,13 @@ public class Program
         {
             Console.WriteLine("CUDA destekli cihaz sayısı: " + cuda_GetCudaEnabledDeviceCount());
         }
+        else if (args.Contains("trimvideo"))
+        {
+            var videoTitle = "En İyi Fallout Şehri Hangisi?";
+            var segment = new VideoSegment { Start = 60, End = 120 };
+            await VideoEditor.TrimFromJsonAsync(segment, videoTitle);
+            return;
+        }
         else if (args.Contains("--testgemini"))
         {
             // var faceMesh = new FaceMeshSolution();
@@ -43,7 +50,7 @@ public class Program
         }
         else if (args.Contains("--testwhisper"))
         {
-            await WhisperBrain.TranscribeAudioWithTimestamps("En İyi Fallout Şehri Hangisi?");
+            await WhisperBrain.TranscribeAudioWithTimestamps("YKSYE_GIREN_PROFESOR__Universitelerin_Sorunu_Ne");
             return;
         }
         else if (args.Contains("--testmp3"))
@@ -64,13 +71,13 @@ public class Program
         else if (args.Contains("--testscroll"))
         {
             Console.WriteLine("Test scroll modu aktif!");
-            VideoSubtitleGenerator.ProcessVideo("En İyi Fallout Şehri Hangisi?", FaceSelectionStrategy.LargestFace);
+            await VideoSubtitleGenerator.ProcessVideoAsync("YKSYE_GIREN_PROFESOR__Universitelerin_Sorunu_Ne", FaceSelectionStrategy.LargestFace, SubtitleStyle.Cartoon);
             return;
         }
 
         else if (args.Contains("--testface"))
         {
-            await FaceCropper.CropToVerticalAsync("En İyi Fallout Şehri Hangisi?", FaceSelectionStrategy.LargestFace);
+            await FaceCropper.CropToVerticalAsync("YKSYE_GIREN_PROFESOR__Universitelerin_Sorunu_Ne", FaceSelectionStrategy.LargestFace);
             return;
         }
         else if (args.Contains("--testdownload"))
@@ -82,10 +89,15 @@ public class Program
             var testdownloadVideoPath = await YoutubeDownloader.DownloadVideoAsync(testvideoUrl, GeneralSettings.GetDownloadDirectory(testgetVideoTitle));
             return;
         }
+        else if (args.Contains("--testvoice"))
+        {
+            await VideoEditor.CombineVideoAndWav("YKSYE_GIREN_PROFESOR__Universitelerin_Sorunu_Ne");
+            return;
+        }
 
-
-        Console.WriteLine("Normal mod");
-        var videoUrl = "https://www.youtube.com/watch?v=EGJpVzgKbIc";
+        var nowTime = DateTime.Now;
+        Console.WriteLine("Program başlatıldı..." +nowTime);
+        var videoUrl = "https://www.youtube.com/watch?v=KpJ_QcupPzA";
         var videoTitleName = await YoutubeDownloader.GetVideoTitleAsync(videoUrl);
         if (videoTitleName == string.Empty)
         {
@@ -121,8 +133,14 @@ public class Program
 
         await FaceCropper.CropToVerticalAsync(videoTitleName, FaceSelectionStrategy.LargestFace);
 
+        Console.WriteLine("Video düzenleme tamamlandı: " + GeneralSettings.GetFaceCropVideoDirectory(videoTitleName, FaceSelectionStrategy.LargestFace));
+        await VideoSubtitleGenerator.ProcessVideoAsync(videoTitleName, FaceSelectionStrategy.LargestFace, SubtitleStyle.Cartoon);
+        Console.WriteLine("Video altyazı oluşturma tamamlandı");
         //Console.WriteLine("Yüz merkezi X koordinatı: " + faceCenterX);
+        await VideoEditor.CombineVideoAndWav(videoTitleName);
 
+        var diff = DateTime.Now - nowTime;
+        Console.WriteLine($"İşlem süresi: {diff.TotalSeconds} saniye");
         // VideoEditor.CropToVertical(
         //     downloadVideoPath,
         //     GeneralSettings.GetOutputDirectory(getVideoTitle),

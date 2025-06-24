@@ -9,15 +9,16 @@ public static class WhisperBrain
     {
         Console.WriteLine("Transkription işlemi başlatılıyor: " + videoTitle);
         var audioFilePath = GeneralSettings.GetWavByOutputPath(videoTitle);
-        var outputDir = GeneralSettings.GetOutputDirectoryForJson(videoTitle,"transcript");
+        var outputDir = GeneralSettings.GetOutputDirectoryForJson(videoTitle, "transcript");
 
         var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "whisper-cli");
         var modelsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "ggml-base.bin");
 
         var language = "tr";
         var outputFormat = "otxt";
-        var arguments = $"-m \"{modelsPath}\" -f \"{audioFilePath}\" -l {language} -{outputFormat}";
-
+        var maxLen = 70; // örnek: her segment maksimum 70 karakter
+        var threads = Environment.ProcessorCount; // ya da sabit sayı örn: 8
+        var arguments = $"-m \"{modelsPath}\" -f \"{audioFilePath}\" -l {language} -{outputFormat} -ml {maxLen} --split-on-word -t {threads}";
 
 
         var psi = new ProcessStartInfo
@@ -36,7 +37,7 @@ public static class WhisperBrain
         Console.WriteLine(errors);
 
         await File.WriteAllTextAsync(outputDir, stdOutput.ToSubtitleJsonList());
-        
+
         await process.WaitForExitAsync();
         return true;
     }

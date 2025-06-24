@@ -100,7 +100,7 @@ public static class YoutubeDownloader
             }
 
             Console.WriteLine($"Video başlığı: {title}");
-            return title;
+            return title.NormalizeString();
         }
         catch (Exception ex)
         {
